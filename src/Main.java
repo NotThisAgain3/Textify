@@ -1,33 +1,47 @@
 import javax.swing.*;
 import javax.swing.filechooser.FileSystemView;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.*;
 
 public class Main {
-    public static File openedFile;
     public static EditorPanel editorPanel = new EditorPanel();
-    public static void main(String[] args) throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        JFrame jFrame = new JFrame("Editor");
+    public static JFrame jFrame = new JFrame("Textify");
 
+    public static void main(String[] args) throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
         JMenuBar jMenuBar = new JMenuBar();
         JMenu file = new JMenu("File");
-        JMenuItem openFile = new JMenuItem("Open File");
-        JMenuItem newFile = new JMenuItem("New File");
+
+        JMenuItem openFile = new JMenuItem("Open");
+        JMenuItem newFile = new JMenuItem("New");
         JMenuItem save = new JMenuItem("Save");
 
         file.add(openFile);
         file.add(newFile);
         file.add(save);
 
+        JMenu theme = new JMenu("Theme");
+
+        JMenuItem newTheme = new JMenuItem("New Theme");
+        JMenuItem loadTheme = new JMenuItem("Load Theme");
+
+        loadTheme.addActionListener(new LoadThemeListener());
+        newTheme.addActionListener(new ChangeThemeListener());
+
+        theme.add(newTheme);
+        theme.add(loadTheme);
+
+
         jMenuBar.add(file);
+        jMenuBar.add(theme);
 
         jFrame.setJMenuBar(jMenuBar);
 
-        openFile.addActionListener(new OpenFileActionListener());
-        newFile.addActionListener(new NewFileActionListener());
-        save.addActionListener(new SaveActionListener());
+        openFile.addActionListener(new OpenFileListener(editorPanel));
+        newFile.addActionListener(new NewFileListener());
+        save.addActionListener(new SaveFileListener(editorPanel));
 
 
         jFrame.setContentPane(editorPanel);
@@ -37,24 +51,30 @@ public class Main {
 
     }
 
-    private static class OpenFileActionListener implements ActionListener {
+    private static class ChangeThemeListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
+            Theme theme = new Theme();
+            theme.textColor = JColorChooser.showDialog(null,"Change Text Color", null);
+            editorPanel.editor.setForeground(theme.textColor);
+            theme.backgroundColor = JColorChooser.showDialog(null,"Change Background Color", null);
+            editorPanel.editor.setBackground(theme.backgroundColor);
+
+            ThemeManager.openedTheme = theme;
+
             JFileChooser jFileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
 
-            int returnValue = jFileChooser.showOpenDialog(null);
+            int returnValue = jFileChooser.showSaveDialog(jFrame);
             if (returnValue == JFileChooser.APPROVE_OPTION) {
-                openedFile = jFileChooser.getSelectedFile();
-
-                BufferedReader bufferedReader;
                 try {
-                    bufferedReader = new BufferedReader(new FileReader(openedFile));
-                    String line;
-                    String total = "";
-                    while((line = bufferedReader.readLine()) != null){
-                        total += line + "\n";
+                    boolean isFileCreated = jFileChooser.getSelectedFile().createNewFile();
+
+                    if (isFileCreated) {
+                        ThemeManager.saveTheme(theme, jFileChooser.getSelectedFile().getPath());
+                    } else {
+                        JOptionPane.showMessageDialog(jFrame, "Failed to create file " + jFileChooser.getSelectedFile());
                     }
-                    editorPanel.editor.setText(total);
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -62,42 +82,16 @@ public class Main {
         }
     }
 
-    private static class SaveActionListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent actionEvent) {
-            if(openedFile != null){
-                String newText = editorPanel.editor.getText();
-
-                try {
-                    BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(openedFile));
-                    bufferedWriter.write(newText);
-                    bufferedWriter.close();
-                }
-                catch (IOException e){
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    private static class NewFileActionListener implements ActionListener {
+    private static class LoadThemeListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
             JFileChooser jFileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
 
-            int returnValue = jFileChooser.showOpenDialog(null);
+            int returnValue = jFileChooser.showOpenDialog(jFrame);
             if (returnValue == JFileChooser.APPROVE_OPTION) {
-                try {
-                    boolean isNewFileCreated = jFileChooser.getSelectedFile().createNewFile();
-                    if(isNewFileCreated){
-                        openedFile = jFileChooser.getSelectedFile();
-                    }
-                    else {
-                        JOptionPane.showMessageDialog(null, "Failed to create file " + jFileChooser.getSelectedFile());
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                ThemeManager.openedTheme = ThemeManager.loadTheme(jFileChooser.getSelectedFile().getPath());
+                editorPanel.editor.setBackground(ThemeManager.openedTheme.backgroundColor);
+                editorPanel.editor.setForeground(ThemeManager.openedTheme.textColor);
             }
         }
     }
